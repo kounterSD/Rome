@@ -1,0 +1,14 @@
+/Users/panthpatel/RiderProjects/Sockets/Sockets/bin/Debug/net8.0/Sockets
+/Users/panthpatel/RiderProjects/Sockets/Sockets/bin/Debug/net8.0/Sockets.deps.json
+/Users/panthpatel/RiderProjects/Sockets/Sockets/bin/Debug/net8.0/Sockets.runtimeconfig.json
+/Users/panthpatel/RiderProjects/Sockets/Sockets/bin/Debug/net8.0/Sockets.dll
+/Users/panthpatel/RiderProjects/Sockets/Sockets/bin/Debug/net8.0/Sockets.pdb
+/Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.GeneratedMSBuildEditorConfig.editorconfig
+/Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.AssemblyInfoInputs.cache
+/Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.AssemblyInfo.cs
+/Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.csproj.CoreCompileInputs.cache
+/Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.dll
+/Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/refint/Sockets.dll
+/Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.pdb
+/Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.genruntimeconfig.cache
+/Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/ref/Sockets.dll
