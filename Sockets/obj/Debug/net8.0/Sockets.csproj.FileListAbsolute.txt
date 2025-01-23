@@ -7,6 +7,7 @@
 /Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.AssemblyInfoInputs.cache
 /Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.AssemblyInfo.cs
 /Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.csproj.CoreCompileInputs.cache
+/Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.sourcelink.json
 /Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.dll
 /Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/refint/Sockets.dll
 /Users/panthpatel/RiderProjects/Sockets/Sockets/obj/Debug/net8.0/Sockets.pdb

@@ -17,62 +17,73 @@ public class Multicast
     public static List<Node> discoveredNodes = new List<Node>();
     
     //on/off switch for Multicast Listener
-    bool mlisten = false;
+    public static bool mlisten = false;
     
     public void StartMulticastListener(String mode)
     {
-        mlisten = true;
-
-        UdpClient listener = new UdpClient(multicastPort);
-        IPAddress multicastGroup = IPAddress.Parse(multicastAddress);
-        listener.JoinMulticastGroup(multicastGroup);
-        //avoids listening to your own packets// doesnt work in MacOS/Linux
-        listener.Client.MulticastLoopback = false;
+        try
+        { 
+            mlisten = true;
+            UdpClient listener = new UdpClient(multicastPort);
+            IPAddress multicastGroup = IPAddress.Parse(multicastAddress);
+            listener.JoinMulticastGroup(multicastGroup);
+            //avoids listening to your own packets// doesnt work in MacOS/Linux
+            listener.Client.MulticastLoopback = false;
         
-        //to stop the listener
-        Task.Run(() => StopListener(listener));
-            
-        Console.WriteLine($"Listening for ENDPOINT DISCOVERY messages on {listener.Client.LocalEndPoint}:{multicastPort}");
+            //to stop the listener
+            Thread stopMultiListener = new Thread(() => StopListener(listener));
+            stopMultiListener.Start();
         
+            Console.WriteLine($"Listening for ENDPOINT DISCOVERY messages on {listener.Client.LocalEndPoint}:{multicastPort}");
         
-        IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
         
-        while (mlisten)
-        {
-            onlineNodes.Clear();
-            
-            //listening for DISCOVERY REQ for 5 seconds
-            DateTime startTime = DateTime.Now;
-            while ((DateTime.Now - startTime).TotalSeconds < 5)
+            while (mlisten)
             {
-                //LOOP for 5s until a DISCOVERY is recieved.
-                byte[] receivedBytes = listener.Receive(ref remoteEndPoint); 
-                string receivedMessage = Encoding.UTF8.GetString(receivedBytes); 
-                //THIS IS WHERE YOU DECRYPT THE MESSAGES
+                onlineNodes.Clear();
+            
+                //listening for DISCOVERY REQ for 5 seconds
+                DateTime startTime = DateTime.Now;
+                while ((DateTime.Now - startTime).TotalSeconds < 5)
+                {
+                    //LOOP for 5s until a DISCOVERY is recieved.
+                    byte[] receivedBytes = listener.Receive(ref remoteEndPoint); 
+                    string receivedMessage = Encoding.UTF8.GetString(receivedBytes); 
                 
-                if (receivedMessage.Contains("DISCOVERY_REQUEST")) 
-                { 
-                    string alias = GetAlias(receivedMessage); 
-                    int peerPort = remoteEndPoint.Port;
-                    //creating peer object with default status=refused
-                    Node peer = new Node(remoteEndPoint.Address, alias, peerPort, Node.ConnectionRequestStatus.Refused);
+                    if (receivedMessage.Contains("DISCOVERY_REQUEST")) 
+                    { 
+                        string alias = GetAlias(receivedMessage); 
+                        int peerPort = remoteEndPoint.Port;
+                        Node peer = new Node(remoteEndPoint.Address, alias, peerPort);
 
-                    //if node list does not have the peer then add.
-                    AddUniqueNode(peer, discoveredNodes);
-                    AddUniqueNode(peer, onlineNodes);
+                        //if node list does not have the peer then add.
+                        AddUniqueNode(peer, discoveredNodes);
+                        AddUniqueNode(peer, onlineNodes);
+                    }
                 }
+            
+                Console.WriteLine($"-------------\nLast 5 seconds: {onlineNodes.Count} nodes available: ");
+                DisplayNodes(onlineNodes);
+                Console.WriteLine("Press Enter to stop the listener...");
+            }
+        
+            //If Active Beacon mode --> Establish p2p TCP connection. & no incoming request
+            if (mode == "active" && !p2p.pendingRequest)
+            {
+                Node node = p2p.SelectNode(onlineNodes);
+                p2p.EstablishTCP(node);
+            }
+
+            if (mode == "active" && p2p.pendingRequest)
+            {
+                Node node = p2p.peer;
+                p2p.EstablishTCP(node);
             }
             
-            Console.WriteLine($"-------------\nLast 5 seconds: {onlineNodes.Count} nodes available: ");
-            DisplayNodes(onlineNodes);
-            Console.WriteLine("Press Enter to stop the listener...");
         }
-        
-        //If Active Beacon mode --> Establish p2p TCP connection.
-        if (mode == "active")
+        catch (Exception ex)
         {
-            Node node = p2p.SelectNode(onlineNodes);
-            p2p.EstablishTCP(node);
+            Console.WriteLine($"Error: {ex.Message}");
         }
     }
 
@@ -108,16 +119,6 @@ public class Multicast
         }
     }
     
-    //responds ACKNOWLEDGEMENT messages back to NODES(remoteEP).
-    static void DiscoveryAck(UdpClient udpClient, IPEndPoint remoteEndPoint)
-    {
-        string responseMessage = "DISCOVERY_ACK";
-        byte[] responseBytes = Encoding.UTF8.GetBytes(responseMessage);
-        udpClient.Send(responseBytes, responseBytes.Length, remoteEndPoint);
-        Console.WriteLine($"ACK sent to {remoteEndPoint.Address}");
-    }
-    
-
     //regex to filter ALIAS from Discovery Message
     public string GetAlias(string message)
     {

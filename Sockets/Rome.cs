@@ -19,23 +19,28 @@ class Rome
         bool exit = false;
         while (!exit)
         {
-            Console.WriteLine("\n1. Initialize Passive Listener - See Available Hosts on the Network\n2. Active Beacon - Advertise your presence and establish connection");
+            Console.WriteLine("\n1. Initialize Passive Listener - See Available Nodes on the Network\n2. Active Beacon - Advertise your presence and establish connection");
             int option = int.Parse(Console.ReadLine());
         
             switch (option)
             {
                 case 1:
-                
                     multicast.StartMulticastListener("passive");
                     break;
                 case 2:
-                    Task.Run(() => p2p.TCPListener());
-                    Task.Run(() => multicast.StartMulticastBroadcaster(myAlias));
-                    multicast.StartMulticastListener("active");
+                    Thread p2pListener = new Thread(() => p2p.TCPListener());
+                    p2pListener.Start();
+
+                    Thread multiListener = new Thread(() => multicast.StartMulticastListener("active"));
+                    multiListener.Start();
+                    
+                    multicast.StartMulticastBroadcaster(myAlias);
                     break;
                     
             }
         }
     }
+    
+    
 
 }
