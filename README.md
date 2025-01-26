@@ -1,11 +1,12 @@
 # Rome p2p
 ### Welcome This is Rome.
 ### Feature Outline
-1. Passive Listener: Discover online nodes on the local Network(Nodes in ACtive Beacon mode)
-2. Active Beacon mode: Avertise yourself for others to discover --> Establish Connection with 1 of the discovered nodes.
+1. Passive Listener: Passively discover online nodes on the local Network(Nodes in Active Beacon mode)
+2. Active Beacon mode: Avertise yourself for others to discover(using UDP) --> Establish Connection with 1 of the discovered nodes.
 
 ### How to Test:
-1.You need atleast 2 devices running Rome.
+
+1. You need atleast 2 devices running Rome. 
 2. Enter alias(This is shown to other users)
 3. Select Active Beacon Mode to initiate Multicast Discovery, and Accepting TCP Connections.
 4. Select a node to send Connection request.
