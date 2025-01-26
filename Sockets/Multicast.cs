@@ -11,83 +11,102 @@ public class Multicast
     
     string multicastAddress = "224.3.69.69";
     int multicastPort = 8999;
-    //Dynamic currently online Nodes list
+    //Dynamic List: Currently Online Nodes
     List<Node> onlineNodes = new List<Node>();
     //List of all discovered Nodes in this session
     public static List<Node> discoveredNodes = new List<Node>();
     
-    //on/off switch for Multicast Listener
-    public static bool mlisten = false;
     
-    public void StartMulticastListener(String mode)
+    //on/off switch for Multicast Listener
+    public static bool mlisten;
+    
+    //Node discovery, and subsequent node funneling
+    public void StartMulticastListener(String mode, CancellationToken cancellationToken)
     {
-        try
+        try 
         { 
             mlisten = true;
-            UdpClient listener = new UdpClient(multicastPort);
-            IPAddress multicastGroup = IPAddress.Parse(multicastAddress);
-            listener.JoinMulticastGroup(multicastGroup);
-            //avoids listening to your own packets// doesnt work in MacOS/Linux
-            listener.Client.MulticastLoopback = false;
-        
-            //to stop the listener
-            Thread stopMultiListener = new Thread(() => StopListener(listener));
-            stopMultiListener.Start();
-        
-            Console.WriteLine($"Listening for ENDPOINT DISCOVERY messages on {listener.Client.LocalEndPoint}:{multicastPort}");
-        
-            IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
-        
-            while (mlisten)
+            using (UdpClient listener = new UdpClient(multicastPort))
             {
-                onlineNodes.Clear();
-            
-                //listening for DISCOVERY REQ for 5 seconds
-                DateTime startTime = DateTime.Now;
-                while ((DateTime.Now - startTime).TotalSeconds < 5)
-                {
-                    //LOOP for 5s until a DISCOVERY is recieved.
-                    byte[] receivedBytes = listener.Receive(ref remoteEndPoint); 
-                    string receivedMessage = Encoding.UTF8.GetString(receivedBytes); 
-                
-                    if (receivedMessage.Contains("DISCOVERY_REQUEST")) 
-                    { 
-                        string alias = GetAlias(receivedMessage); 
-                        int peerPort = remoteEndPoint.Port;
-                        Node peer = new Node(remoteEndPoint.Address, alias, peerPort);
+                IPAddress multicastGroup = IPAddress.Parse(multicastAddress);
+                listener.JoinMulticastGroup(multicastGroup);
+                //avoids listening to your own packets// doesnt work in MacOS or Linux..works in Windows
+                listener.Client.MulticastLoopback = false;
+                //to stop the listener
+                var stopMultiListener = Task.Run(() => CloseMulticastListener(listener), cancellationToken);
+        
+                Console.WriteLine($"Listening for ENDPOINT DISCOVERY messages on {listener.Client.LocalEndPoint}");
+        
+                IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
 
-                        //if node list does not have the peer then add.
-                        AddUniqueNode(peer, discoveredNodes);
-                        AddUniqueNode(peer, onlineNodes);
+
+                while (mlisten)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        Console.WriteLine($"Stopping multicast listener");
+                        cancellationToken.ThrowIfCancellationRequested();
                     }
+                    onlineNodes.Clear();
+            
+                    //listening for DISCOVERY REQ for 5 seconds
+                    DateTime startTime = DateTime.Now;
+                    while ((DateTime.Now - startTime).TotalSeconds < 5)
+                    {
+                        //LOOP for 5s until a DISCOVERY is recieved.
+                        byte[] receivedBytes = listener.Receive(ref remoteEndPoint); 
+                        string receivedMessage = Encoding.UTF8.GetString(receivedBytes); 
+                
+                        if (receivedMessage.Contains("DISCOVERY_REQUEST")) 
+                        { 
+                            string alias = GetAlias(receivedMessage);  
+                            int peerPort = remoteEndPoint.Port;
+                            Node peer = new Node(remoteEndPoint.Address, alias, peerPort, Node.ConnectionRequestStatus.Refused);
+
+                            //if node list does not have the peer then add.
+                            AddUniqueNode(peer, discoveredNodes);
+                            AddUniqueNode(peer, onlineNodes);
+                        }
+                    }
+            
+                    Console.WriteLine($"-------------\nLast 5 seconds: {onlineNodes.Count} nodes available: ");
+                    DisplayNodes(onlineNodes);
+                    Console.WriteLine("Press Enter to stop the listener...");
                 }
             
-                Console.WriteLine($"-------------\nLast 5 seconds: {onlineNodes.Count} nodes available: ");
-                DisplayNodes(onlineNodes);
-                Console.WriteLine("Press Enter to stop the listener...");
-            }
-        
-            //If Active Beacon mode --> Establish p2p TCP connection. & no incoming request
-            if (mode == "active" && !p2p.pendingRequest)
-            {
-                Node node = p2p.SelectNode(onlineNodes);
-                p2p.EstablishTCP(node);
-            }
-
-            if (mode == "active" && p2p.pendingRequest)
-            {
-                Node node = p2p.peer;
-                p2p.EstablishTCP(node);
-            }
-            
+                //If Active Beacon mode --> Establish p2p TCP connection.
+                if (mode == "active")
+                {
+                    var initiateConn = Task.Run(() =>
+                    {
+                        //Asks user for input: which node to estalish conenction with
+                        Node node = p2p.SelectNode(onlineNodes);
+                        //accept connection when they reply.
+                        discoveredNodes[discoveredNodes.IndexOf(p2p.GetNodeByIP(node.ipaddress))].status = Node.ConnectionRequestStatus.Accepted;
+                        //establishes connection with the selected node.
+                        p2p.EstablishTCP(node);
+                    }, cancellationToken);
+                    while (true)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                        {
+                            Console.WriteLine($"Stopping multicast listener");
+                            cancellationToken.ThrowIfCancellationRequested();
+                        }
+                    }
+                
+                }
+            } 
         }
+            
         catch (Exception ex)
         {
             Console.WriteLine($"Error: {ex.Message}");
         }
     }
 
-    public void StopListener(UdpClient udpClient)
+    //bg method to close Multicast Listener
+    public void CloseMulticastListener(UdpClient udpClient)
     {
         Console.WriteLine("Press Enter to stop the listener...");
         Console.ReadLine();
@@ -96,6 +115,7 @@ public class Multicast
         udpClient.Close();
     }
     
+    //Starts sending MULTICAST_DISCOVERY_REQUESTS
     public void StartMulticastBroadcaster(string alias)
     {
         bool endMulticast = false;
@@ -130,7 +150,8 @@ public class Multicast
         }
         return null;
     }
-
+    
+    //Displays nodes in a list
     void DisplayNodes(List<Node> nodes)
     {
         foreach (Node node in nodes)
@@ -139,7 +160,8 @@ public class Multicast
         }
         Console.WriteLine("-------------");
     }
-
+    
+    //Uniquely adds given node to the given list(Comparing )
     void AddUniqueNode(Node node, List<Node> nodes)
     {
         if (!nodes.Any(n => n.ipaddress.Equals(node.ipaddress) && n.alias.Equals(node.alias))) 

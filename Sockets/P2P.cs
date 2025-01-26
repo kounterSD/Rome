@@ -6,13 +6,20 @@ using System.Text;
 namespace Sockets;
 
 public class P2P
-{ 
-    //true=Incoming TCP ConnectionRequest available, False=no incoming TCP Connections
-    public bool pendingRequest;
+{
+    private readonly CancellationTokenSource cTokenSource;
+
+    public P2P(CancellationTokenSource _cts)
+    {
+       cTokenSource = _cts;
+    }
+    public P2P(){}
+    
     public Node peer;
     
     static int tcpListenPort = 63966;
     static int tcpConnectToPort = 63966;
+    
     public void EstablishTCP(Node node)
     {
         TCPClient(node.ipaddress, tcpConnectToPort);
@@ -28,20 +35,13 @@ public class P2P
 
             while (true)
             {
+                //if there is an incomming connection
                 if (listener.Pending())
                 {
-                    //stops multicastListener
-                    pendingRequest = true;
-                    Thread.Sleep(1000);
-                    Multicast.mlisten = false;
-                    
-                    
-                
                     TcpClient client = listener.AcceptTcpClient();
                     IPEndPoint IncomConn = (IPEndPoint)client.Client.RemoteEndPoint;
                     peer = GetNodeByIP(IncomConn.Address);
-                    //set the node as accepted for future
-                    HandleClient(client, peer);
+                    Task.Run(()=>HandleIncommingReq(client, peer));
                 }
                
             }
@@ -51,7 +51,52 @@ public class P2P
             Console.WriteLine($"Error: {ex.Message}");
         }
     }
+    public void HandleIncommingReq(TcpClient client, Node node)
+    {
+        if (PeerAllowed(node))
+        {
+            HandleClient(client, node);
+            EstablishTCP(node);
+        }
 
+        if (!PeerAllowed(node))
+        {
+            Console.WriteLine($"Incomming Request from: {node.alias}:{node.ipaddress}\nWould you like to accept?(y/n)");
+            string userInput = Console.ReadLine();
+            if (userInput == "y")
+            {
+                Console.WriteLine($"Accepted Request from: {node.alias}:{node.ipaddress}");
+                //mark node status as accepted for future connections
+                Multicast.discoveredNodes[Multicast.discoveredNodes.IndexOf(GetNodeByIP(node.ipaddress))].status = Node.ConnectionRequestStatus.Accepted;
+                RequestMultiListenerCancellation();
+                HandleClient(client, node);
+                EstablishTCP(node);
+            }
+
+            if (userInput == "n")
+            {
+                Console.WriteLine($"Connection refused");
+            }
+            
+        }
+       
+    }
+
+    public void RequestMultiListenerCancellation()
+    {
+        cTokenSource.Cancel();
+    }
+
+    public bool PeerAllowed(Node node)
+    {
+        Node n = GetNodeByIP(node.ipaddress);
+        if (n.status == Node.ConnectionRequestStatus.Accepted)
+        {
+            return true;
+        }
+        return false;
+    }
+    
     //Handlng incoming client after recieving a connection 
     void HandleClient(TcpClient client, Node peer)
     {
@@ -74,6 +119,7 @@ public class P2P
         }
     }
 
+    
     static void TCPClient(IPAddress serverIP, int port)
     {
         try
@@ -89,8 +135,6 @@ public class P2P
 
                 byte[] data = Encoding.UTF8.GetBytes(message);
                 stream.Write(data, 0, data.Length);
-                Thread.Sleep(10);
-
                 client.Close();
             }
 
@@ -124,7 +168,7 @@ public class P2P
         }
     }
 
-    Node GetNodeByIP(IPAddress ipAddress)
+    public Node GetNodeByIP(IPAddress ipAddress)
     {
         Node node = Multicast.discoveredNodes.FirstOrDefault(n => n.ipaddress.Equals(ipAddress));
         return node;

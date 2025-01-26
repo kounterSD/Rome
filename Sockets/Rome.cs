@@ -10,8 +10,12 @@ class Rome
 
     static void Menu()
     {
+        //Initiallizing cancellationToken to cancel Mulicast Listener in case an Incomming Connection request is satisfied.
+        var mListenerCancellationTokenSource = new CancellationTokenSource();
+        CancellationToken mListenerToken = mListenerCancellationTokenSource.Token;
+        
         Multicast multicast = new Multicast();
-        P2P p2p = new P2P();
+        P2P p2p = new P2P(mListenerCancellationTokenSource);
         
         Console.WriteLine("Enter your Alias: ");
         string myAlias = Console.ReadLine();
@@ -25,16 +29,18 @@ class Rome
             switch (option)
             {
                 case 1:
-                    multicast.StartMulticastListener("passive");
+                    multicast.StartMulticastListener("passive", mListenerToken);
                     break;
                 case 2:
+                    //Starting TCP Listener in the background for possible incoming Connection Requests.
                     Thread p2pListener = new Thread(() => p2p.TCPListener());
                     p2pListener.Start();
-
-                    Thread multiListener = new Thread(() => multicast.StartMulticastListener("active"));
-                    multiListener.Start();
                     
-                    multicast.StartMulticastBroadcaster(myAlias);
+                    //Starting Multicast Listener (UDP).
+                    Thread multiListener = new Thread(()=> multicast.StartMulticastListener("active", mListenerToken));
+                    multiListener.Start();
+
+                    multicast.StartMulticastBroadcaster(myAlias);                    
                     break;
                     
             }
