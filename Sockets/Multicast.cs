@@ -139,16 +139,19 @@ public class Multicast
         }
     }
     
-    //regex to filter ALIAS from Discovery Message
-    public string GetAlias(string message)
+    //Extract ALIAS from Discovery Message
+    string GetAlias(string message)
     {
-        string pattern = @"(?<=ALIAS:)[^ ]+";
-        Match match = Regex.Match(message, pattern);
-        if (match.Success)
-        {
-            return match.Value;
-        }
-        return null;
+        string key = "ALIAS:";
+        int start = message.IndexOf(key);
+        start += key.Length; // Move index to start of alias value
+        
+        int endIndex = message.IndexOf('\n', start);
+        
+        if (endIndex == -1)
+            return message.Substring(start).Trim(); // Extract till end if no newline
+        
+        return message.Substring(start, endIndex - start).Trim(); // Extract alias
     }
     
     //Displays nodes in a list
